@@ -1,4 +1,5 @@
-"""Launch blur_gui, screenshot its window, close it. Used for README image."""
+"""Launch blur_gui, screenshot its window (even if obscured), close it."""
+import ctypes
 import subprocess
 import sys
 import time
@@ -6,14 +7,15 @@ from pathlib import Path
 
 import win32con
 import win32gui
-from PIL import ImageGrab
+import win32ui
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 GUI = ROOT / "blur_gui.pyw"
 OUT = ROOT / "docs" / "screenshot.png"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
-TITLE = "Blur Faces - local + free (deface)"
+TITLE = "blur faces - free, local, no cap"
 
 proc = subprocess.Popen(["pythonw", str(GUI)])
 print(f"Launched pythonw PID {proc.pid}")
@@ -29,22 +31,37 @@ if not hwnd:
     print("ERROR: window not found")
     proc.kill()
     sys.exit(1)
-
 print(f"Found HWND {hwnd}")
-try:
-    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-except Exception:
-    pass
-try:
-    win32gui.SetForegroundWindow(hwnd)
-except Exception:
-    pass
-time.sleep(0.8)
 
-rect = win32gui.GetWindowRect(hwnd)
-print(f"Window rect: {rect}")
+# Give the window a moment to fully render
+time.sleep(1.0)
 
-img = ImageGrab.grab(bbox=rect, all_screens=True)
+left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+w, h = right - left, bottom - top
+print(f"Window rect: {(left, top, right, bottom)}  size=({w}, {h})")
+
+# PrintWindow with PW_RENDERFULLCONTENT (0x2) grabs the actual window pixels,
+# regardless of z-order or occlusion.
+hwndDC = win32gui.GetWindowDC(hwnd)
+mfcDC = win32ui.CreateDCFromHandle(hwndDC)
+saveDC = mfcDC.CreateCompatibleDC()
+bmp = win32ui.CreateBitmap()
+bmp.CreateCompatibleBitmap(mfcDC, w, h)
+saveDC.SelectObject(bmp)
+
+result = ctypes.windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 2)
+print(f"PrintWindow result: {result}")
+
+info = bmp.GetInfo()
+bits = bmp.GetBitmapBits(True)
+img = Image.frombuffer("RGB", (info["bmWidth"], info["bmHeight"]),
+                       bits, "raw", "BGRX", 0, 1)
+
+win32gui.DeleteObject(bmp.GetHandle())
+saveDC.DeleteDC()
+mfcDC.DeleteDC()
+win32gui.ReleaseDC(hwnd, hwndDC)
+
 img.save(OUT)
 print(f"Saved: {OUT}  size={img.size}")
 

@@ -1,4 +1,4 @@
-"""Drag-and-drop GUI wrapper for deface."""
+"""Drag-and-drop GUI wrapper for deface. Dark-mode redesign."""
 import os
 import queue
 import re
@@ -6,9 +6,10 @@ import shutil
 import subprocess
 import sys
 import threading
+import tkinter as tk
 from pathlib import Path
 from tkinter import (
-    BooleanVar, DoubleVar, StringVar, Tk, Toplevel,
+    BooleanVar, DoubleVar, StringVar, Tk,
     filedialog, messagebox, ttk, END, NORMAL, DISABLED,
 )
 from tkinter.scrolledtext import ScrolledText
@@ -23,6 +24,31 @@ VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mpg", ".mpeg", 
 HERE = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = HERE / "output"
 SCRIPTS_DIR = Path(os.environ.get("APPDATA", "")) / "Python" / "Python313" / "Scripts"
+
+WIN_TITLE = "blur faces - free, local, no cap"
+
+# theme
+BG = "#0b0b14"
+CARD = "#161624"
+CARD_HI = "#1f1f30"
+BORDER = "#2a2a40"
+TEXT = "#f5f5fa"
+DIM = "#8a8aa3"
+ACCENT = "#a78bfa"
+ACCENT_HOT = "#c4a8ff"
+PINK = "#ec4899"
+GREEN = "#34d399"
+YELLOW = "#fbbf24"
+RED = "#f87171"
+
+F_TITLE = ("Segoe UI Variable Display", 24, "bold")
+F_SUB = ("Segoe UI Variable", 11)
+F_HEAD = ("Segoe UI Variable Display", 11, "bold")
+F_BODY = ("Segoe UI Variable", 11)
+F_BTN = ("Segoe UI Variable Display", 11, "bold")
+F_BIG_BTN = ("Segoe UI Variable Display", 13, "bold")
+F_MONO = ("Cascadia Mono", 10)
+F_DROP = ("Segoe UI Variable Display", 14, "bold")
 
 
 def find_deface():
@@ -56,12 +82,52 @@ def parse_dropped(data: str):
     return [p for p in paths if p]
 
 
+def make_card(parent, **kw):
+    return tk.Frame(parent, bg=CARD, highlightthickness=1,
+                    highlightbackground=BORDER, highlightcolor=BORDER, **kw)
+
+
+def make_btn(parent, text, command, *, kind="primary", **kw):
+    colors = {
+        "primary": (ACCENT, "#0b0b14", ACCENT_HOT),
+        "ghost":   (CARD_HI, TEXT, BORDER),
+        "danger":  (RED, "#0b0b14", "#fca5a5"),
+        "ok":      (GREEN, "#0b0b14", "#6ee7b7"),
+    }[kind]
+    bg_c, fg_c, hover = colors
+    btn = tk.Button(
+        parent, text=text, command=command,
+        bg=bg_c, fg=fg_c, activebackground=hover, activeforeground=fg_c,
+        relief="flat", bd=0, padx=18, pady=9, cursor="hand2",
+        font=kw.pop("font", F_BTN), **kw,
+    )
+    btn.bind("<Enter>", lambda _e: btn.configure(bg=hover))
+    btn.bind("<Leave>", lambda _e: btn.configure(bg=bg_c))
+    btn._base_bg = bg_c
+    return btn
+
+
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("Blur Faces - local + free (deface)")
-        root.geometry("760x640")
-        root.minsize(620, 540)
+        root.title(WIN_TITLE)
+        root.configure(bg=BG)
+        root.geometry("820x960")
+        root.minsize(700, 720)
+
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure("Dark.Horizontal.TProgressbar",
+                        background=ACCENT, troughcolor=CARD_HI,
+                        bordercolor=BORDER, lightcolor=ACCENT, darkcolor=ACCENT)
+        style.configure("Dark.Horizontal.TScale",
+                        background=CARD, troughcolor=CARD_HI,
+                        bordercolor=BORDER, lightcolor=ACCENT, darkcolor=ACCENT)
+        style.map("Dark.Horizontal.TScale",
+                  background=[("active", ACCENT_HOT)])
 
         self.files: list[Path] = []
         self.output_dir = StringVar(value=str(DEFAULT_OUTPUT))
@@ -80,84 +146,164 @@ class App:
         self.root.after(80, self._drain_log)
 
     def _build_ui(self):
-        pad = {"padx": 10, "pady": 6}
+        root = self.root
 
-        drop = ttk.Frame(self.root, relief="ridge", borderwidth=2)
-        drop.pack(fill="x", padx=12, pady=(12, 6))
-        self.drop_label = ttk.Label(
+        # ── header ──
+        header = tk.Frame(root, bg=BG)
+        header.pack(fill="x", padx=22, pady=(20, 8))
+        tk.Label(header, text="blur faces.", bg=BG, fg=TEXT,
+                 font=F_TITLE).pack(side="left")
+        tk.Label(header, text="  free  •  offline  •  no upload",
+                 bg=BG, fg=ACCENT, font=F_HEAD).pack(side="left", pady=(14, 0))
+
+        tk.Label(root, text="drag a video. blur every face. that's it.",
+                 bg=BG, fg=DIM, font=F_SUB).pack(anchor="w", padx=24, pady=(0, 14))
+
+        # ── drop zone ──
+        drop_outer = tk.Frame(root, bg=ACCENT, padx=2, pady=2)
+        drop_outer.pack(fill="x", padx=22, pady=(0, 10))
+        drop = tk.Frame(drop_outer, bg=CARD)
+        drop.pack(fill="both", expand=True)
+        self.drop_label = tk.Label(
             drop,
-            text=("Drop video files here\n(or click 'Add files...')"
+            text=("drop ur vids here\n— or click 'add files' below —"
                   if DND_AVAILABLE else
-                  "Drag-drop unavailable - click 'Add files...' below"),
-            anchor="center", justify="center", font=("Segoe UI", 12),
+                  "drag-drop unavailable — use 'add files' below"),
+            bg=CARD, fg=TEXT, font=F_DROP,
+            anchor="center", justify="center", pady=34,
         )
-        self.drop_label.pack(fill="x", ipady=28)
+        self.drop_label.pack(fill="both", expand=True)
         if DND_AVAILABLE:
-            drop.drop_target_register(DND_FILES)
-            drop.dnd_bind("<<Drop>>", self._on_drop)
-            self.drop_label.drop_target_register(DND_FILES)
-            self.drop_label.dnd_bind("<<Drop>>", self._on_drop)
+            for w in (drop, self.drop_label, drop_outer):
+                w.drop_target_register(DND_FILES)
+                w.dnd_bind("<<Drop>>", self._on_drop)
 
-        list_frame = ttk.LabelFrame(self.root, text="Queue")
-        list_frame.pack(fill="both", expand=False, padx=12, pady=6)
-        self.listbox = ScrolledText(list_frame, height=5, state=DISABLED, wrap="none")
-        self.listbox.pack(fill="x", padx=6, pady=6)
+        # ── queue card ──
+        q_card = make_card(root)
+        q_card.pack(fill="x", padx=22, pady=8)
+        tk.Label(q_card, text="queue", bg=CARD, fg=PINK,
+                 font=F_HEAD).pack(anchor="w", padx=14, pady=(10, 4))
+        self.listbox = ScrolledText(
+            q_card, height=4, wrap="none",
+            bg=CARD_HI, fg=TEXT, insertbackground=TEXT,
+            relief="flat", bd=0, font=F_MONO,
+            highlightthickness=1, highlightbackground=BORDER,
+        )
+        self.listbox.pack(fill="x", padx=14, pady=(0, 8))
+        self.listbox.configure(state=DISABLED)
 
-        btn_row = ttk.Frame(self.root)
-        btn_row.pack(fill="x", padx=12)
-        ttk.Button(btn_row, text="Add files...", command=self._pick_files).pack(side="left")
-        ttk.Button(btn_row, text="Clear queue", command=self._clear_queue).pack(side="left", padx=6)
+        qbtn = tk.Frame(q_card, bg=CARD)
+        qbtn.pack(fill="x", padx=12, pady=(0, 12))
+        make_btn(qbtn, "+ add files", self._pick_files, kind="ghost").pack(side="left", padx=4)
+        make_btn(qbtn, "clear", self._clear_queue, kind="ghost").pack(side="left", padx=4)
 
-        opts = ttk.LabelFrame(self.root, text="Options")
-        opts.pack(fill="x", padx=12, pady=8)
+        # ── options card ──
+        opts = make_card(root)
+        opts.pack(fill="x", padx=22, pady=8)
+        tk.Label(opts, text="vibe check", bg=CARD, fg=PINK,
+                 font=F_HEAD).pack(anchor="w", padx=14, pady=(10, 6))
 
-        row1 = ttk.Frame(opts); row1.pack(fill="x", **pad)
-        ttk.Label(row1, text="Mode:").pack(side="left")
-        for v in ("blur", "mosaic", "solid", "none"):
-            ttk.Radiobutton(row1, text=v, variable=self.mode, value=v).pack(side="left", padx=4)
-        ttk.Checkbutton(row1, text="Keep audio", variable=self.keep_audio).pack(side="right")
+        # mode pills
+        modes = tk.Frame(opts, bg=CARD)
+        modes.pack(fill="x", padx=12, pady=(0, 8))
+        tk.Label(modes, text="mode:", bg=CARD, fg=DIM, font=F_BODY).pack(side="left", padx=(4, 8))
+        for v, label in (("blur", "🫧 blur"), ("mosaic", "🟪 mosaic"),
+                         ("solid", "⬛ solid"), ("none", "👀 detect")):
+            rb = tk.Radiobutton(
+                modes, text=label, variable=self.mode, value=v,
+                indicatoron=False, bd=0, padx=14, pady=7,
+                bg=CARD_HI, fg=TEXT,
+                selectcolor=ACCENT,
+                activebackground=ACCENT_HOT, activeforeground="#0b0b14",
+                font=F_BTN, relief="flat", cursor="hand2",
+                tristatevalue="x_unused",
+            )
+            rb.pack(side="left", padx=3)
 
-        row2 = ttk.Frame(opts); row2.pack(fill="x", **pad)
-        ttk.Label(row2, text="Detection threshold (lower=more aggressive):").pack(side="left")
-        ttk.Scale(row2, from_=0.05, to=0.6, variable=self.thresh, orient="horizontal", length=200).pack(side="left", padx=8)
-        self.thresh_lbl = ttk.Label(row2, width=5, text="0.20")
-        self.thresh_lbl.pack(side="left")
-        self.thresh.trace_add("write", lambda *_: self.thresh_lbl.config(text=f"{self.thresh.get():.2f}"))
+        # toggles
+        toggles = tk.Frame(opts, bg=CARD)
+        toggles.pack(fill="x", padx=12, pady=4)
+        for var, label in (
+            (self.keep_audio, "🔊 keep audio"),
+            (self.use_boxes, "▭ box masks"),
+        ):
+            cb = tk.Checkbutton(
+                toggles, text=label, variable=var,
+                bg=CARD, fg=TEXT, selectcolor=CARD_HI,
+                activebackground=CARD, activeforeground=ACCENT,
+                font=F_BODY, bd=0, relief="flat", cursor="hand2",
+            )
+            cb.pack(side="left", padx=8)
 
-        row3 = ttk.Frame(opts); row3.pack(fill="x", **pad)
-        ttk.Label(row3, text="Mask size (bigger = more coverage):").pack(side="left")
-        ttk.Scale(row3, from_=1.0, to=2.5, variable=self.mask_scale, orient="horizontal", length=200).pack(side="left", padx=8)
-        self.mask_lbl = ttk.Label(row3, width=5, text="1.30")
-        self.mask_lbl.pack(side="left")
-        self.mask_scale.trace_add("write", lambda *_: self.mask_lbl.config(text=f"{self.mask_scale.get():.2f}"))
+        # sliders
+        for label, var, lo, hi, fmt in (
+            ("face detection sensitivity", self.thresh, 0.05, 0.6, "{:.2f}"),
+            ("blur cushion (how much around the face)", self.mask_scale, 1.0, 2.5, "{:.2f}"),
+        ):
+            row = tk.Frame(opts, bg=CARD)
+            row.pack(fill="x", padx=14, pady=4)
+            tk.Label(row, text=label, bg=CARD, fg=DIM, font=F_BODY).pack(side="left")
+            value_lbl = tk.Label(row, text=fmt.format(var.get()), width=6,
+                                 bg=CARD, fg=ACCENT, font=F_HEAD)
+            value_lbl.pack(side="right")
+            ttk.Scale(row, from_=lo, to=hi, variable=var, orient="horizontal",
+                      length=220, style="Dark.Horizontal.TScale").pack(side="right", padx=10)
+            var.trace_add("write", lambda *_x, lbl=value_lbl, v=var, f=fmt: lbl.config(text=f.format(v.get())))
 
-        row4 = ttk.Frame(opts); row4.pack(fill="x", **pad)
-        ttk.Checkbutton(row4, text="Use rectangles (instead of ellipse)", variable=self.use_boxes).pack(side="left")
-        ttk.Label(row4, text="   Mosaic block size:").pack(side="left")
-        ttk.Entry(row4, textvariable=self.mosaic_size, width=5).pack(side="left", padx=4)
+        # mosaic size + output folder
+        misc = tk.Frame(opts, bg=CARD)
+        misc.pack(fill="x", padx=14, pady=(8, 4))
+        tk.Label(misc, text="mosaic block size:", bg=CARD, fg=DIM, font=F_BODY).pack(side="left")
+        tk.Entry(misc, textvariable=self.mosaic_size, width=5,
+                 bg=CARD_HI, fg=TEXT, insertbackground=TEXT,
+                 relief="flat", font=F_BODY,
+                 highlightthickness=1, highlightbackground=BORDER,
+                 highlightcolor=ACCENT).pack(side="left", padx=8)
 
-        row5 = ttk.Frame(opts); row5.pack(fill="x", **pad)
-        ttk.Label(row5, text="Output folder:").pack(side="left")
-        ttk.Entry(row5, textvariable=self.output_dir).pack(side="left", fill="x", expand=True, padx=6)
-        ttk.Button(row5, text="Browse...", command=self._pick_outdir).pack(side="left")
+        outrow = tk.Frame(opts, bg=CARD)
+        outrow.pack(fill="x", padx=14, pady=(6, 14))
+        tk.Label(outrow, text="output folder:", bg=CARD, fg=DIM,
+                 font=F_BODY).pack(side="left")
+        tk.Entry(outrow, textvariable=self.output_dir,
+                 bg=CARD_HI, fg=TEXT, insertbackground=TEXT,
+                 relief="flat", font=F_BODY,
+                 highlightthickness=1, highlightbackground=BORDER,
+                 highlightcolor=ACCENT).pack(side="left", fill="x", expand=True, padx=8)
+        make_btn(outrow, "browse", self._pick_outdir, kind="ghost").pack(side="left")
 
-        action = ttk.Frame(self.root); action.pack(fill="x", padx=12, pady=(4, 6))
-        self.start_btn = ttk.Button(action, text="Blur faces", command=self._start)
+        # ── action bar ──
+        action = tk.Frame(root, bg=BG)
+        action.pack(fill="x", padx=22, pady=(6, 4))
+        self.start_btn = make_btn(action, "✨  blur it  ✨", self._start,
+                                  kind="primary", font=F_BIG_BTN)
         self.start_btn.pack(side="left")
-        self.stop_btn = ttk.Button(action, text="Stop", command=self._stop, state=DISABLED)
-        self.stop_btn.pack(side="left", padx=6)
-        ttk.Button(action, text="Open output folder", command=self._open_outdir).pack(side="left", padx=6)
-        self.status = ttk.Label(action, text="Idle.", foreground="#444")
+        self.stop_btn = make_btn(action, "stop", self._stop, kind="danger")
+        self.stop_btn.pack(side="left", padx=8)
+        self.stop_btn.configure(state=DISABLED)
+        make_btn(action, "open output", self._open_outdir, kind="ghost").pack(side="left", padx=4)
+        self.status = tk.Label(action, text="idle. drop a vid 👇", bg=BG, fg=DIM, font=F_BODY)
         self.status.pack(side="right")
 
-        self.progress = ttk.Progressbar(self.root, mode="determinate", maximum=100)
-        self.progress.pack(fill="x", padx=12, pady=(0, 6))
+        # progress
+        self.progress = ttk.Progressbar(root, mode="determinate", maximum=100,
+                                        style="Dark.Horizontal.TProgressbar")
+        self.progress.pack(fill="x", padx=22, pady=(4, 8))
 
-        log_frame = ttk.LabelFrame(self.root, text="Log")
-        log_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        self.log = ScrolledText(log_frame, height=10, state=DISABLED, wrap="word")
-        self.log.pack(fill="both", expand=True, padx=6, pady=6)
+        # log
+        log_card = make_card(root)
+        log_card.pack(fill="both", expand=True, padx=22, pady=(4, 18))
+        tk.Label(log_card, text="what's happening", bg=CARD, fg=PINK,
+                 font=F_HEAD).pack(anchor="w", padx=14, pady=(10, 4))
+        self.log = ScrolledText(
+            log_card, height=10, wrap="word",
+            bg=CARD_HI, fg=TEXT, insertbackground=TEXT,
+            relief="flat", bd=0, font=F_MONO,
+            highlightthickness=1, highlightbackground=BORDER,
+        )
+        self.log.pack(fill="both", expand=True, padx=14, pady=(0, 12))
+        self.log.configure(state=DISABLED)
 
+    # ── interactions ──
     def _on_drop(self, event):
         for p in parse_dropped(event.data):
             self._add_path(Path(p))
@@ -165,8 +311,8 @@ class App:
 
     def _pick_files(self):
         paths = filedialog.askopenfilenames(
-            title="Pick video file(s)",
-            filetypes=[("Videos", " ".join(f"*{e}" for e in sorted(VIDEO_EXTS))), ("All files", "*.*")],
+            title="pick a video",
+            filetypes=[("videos", " ".join(f"*{e}" for e in sorted(VIDEO_EXTS))), ("all files", "*.*")],
         )
         for p in paths:
             self._add_path(Path(p))
@@ -180,7 +326,7 @@ class App:
     def _open_outdir(self):
         d = Path(self.output_dir.get())
         d.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(d))  # noqa: S606  (Windows-only by design)
+        os.startfile(str(d))  # noqa: S606
 
     def _add_path(self, p: Path):
         if p.is_dir():
@@ -190,7 +336,7 @@ class App:
         elif p.suffix.lower() in VIDEO_EXTS:
             self.files.append(p)
         else:
-            self._log(f"Skipped (not a video): {p}")
+            self._log(f"skipped (not a video): {p}")
 
     def _clear_queue(self):
         self.files.clear()
@@ -202,6 +348,7 @@ class App:
         for f in self.files:
             self.listbox.insert(END, f"{f}\n")
         self.listbox.config(state=DISABLED)
+        self.status.config(text=f"{len(self.files)} in queue" if self.files else "idle. drop a vid 👇")
 
     def _log(self, msg: str):
         self.log_q.put(msg)
@@ -220,7 +367,7 @@ class App:
 
     def _start(self):
         if not self.files:
-            messagebox.showinfo("Nothing to do", "Add at least one video first.")
+            messagebox.showinfo("nothing here", "add at least one video first ✨")
             return
         outdir = Path(self.output_dir.get())
         outdir.mkdir(parents=True, exist_ok=True)
@@ -228,7 +375,8 @@ class App:
         self.start_btn.config(state=DISABLED)
         self.stop_btn.config(state=NORMAL)
         self.progress["value"] = 0
-        self.worker = threading.Thread(target=self._run_jobs, args=(list(self.files), outdir), daemon=True)
+        self.worker = threading.Thread(target=self._run_jobs,
+                                       args=(list(self.files), outdir), daemon=True)
         self.worker.start()
 
     def _stop(self):
@@ -238,8 +386,8 @@ class App:
                 self.current_proc.terminate()
             except Exception:
                 pass
-        self._log("Stop requested.")
-        self.status.config(text="Stopping...")
+        self._log("stop requested.")
+        self.status.config(text="stopping...")
 
     def _run_jobs(self, files: list[Path], outdir: Path):
         deface_cmd = find_deface()
@@ -267,17 +415,17 @@ class App:
             args.append(str(f))
 
             self.root.after(0, lambda i=i, total=total, name=f.name:
-                            self.status.config(text=f"[{i}/{total}] {name}"))
+                            self.status.config(text=f"cooking [{i}/{total}] {name}"))
             self._log(f"\n=== [{i}/{total}] {f}")
             self._log(" ".join(f'"{a}"' if " " in a else a for a in args))
             rc = self._run_one(args)
             if rc == 0:
-                self._log(f"OK -> {out}")
+                self._log(f"ok -> {out}")
             elif self.stop_flag.is_set():
-                self._log("Stopped.")
+                self._log("stopped.")
                 break
             else:
-                self._log(f"FAILED (exit {rc})")
+                self._log(f"failed (exit {rc})")
             self.root.after(0, lambda v=(i / total) * 100: self.progress.configure(value=v))
 
         self.root.after(0, self._jobs_done)
@@ -291,7 +439,7 @@ class App:
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except FileNotFoundError as e:
-            self._log(f"Could not launch deface: {e}")
+            self._log(f"could not launch deface: {e}")
             return -1
         assert self.current_proc.stdout is not None
         pct_re = re.compile(r"(\d{1,3})%")
@@ -312,7 +460,7 @@ class App:
     def _jobs_done(self):
         self.start_btn.config(state=NORMAL)
         self.stop_btn.config(state=DISABLED)
-        self.status.config(text="Done.")
+        self.status.config(text="done ✨")
         self.progress["value"] = 100
 
 
@@ -321,10 +469,6 @@ def main():
         root = TkinterDnD.Tk()
     else:
         root = Tk()
-    try:
-        ttk.Style().theme_use("vista")
-    except Exception:
-        pass
     App(root)
     root.mainloop()
 
