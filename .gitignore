@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Don't ship user videos
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
+
+# Don't ship downloaded models or local caches
+*.onnx
+*.log

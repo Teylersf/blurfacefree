@@ -1,0 +1,4 @@
+deface>=1.5.0
+tkinterdnd2>=0.4.3
+onnxruntime-directml>=1.17.0
+onnx>=1.16.0
