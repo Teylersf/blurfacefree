@@ -9,6 +9,8 @@ Automatically detect and blur faces in MP4, MOV, MKV, AVI, WEBM and more — rig
 ![License: MIT](https://img.shields.io/badge/License-MIT-green)
 ![Offline](https://img.shields.io/badge/Runs-100%25%20offline-brightgreen)
 
+![Blur Faces Free GUI — drag-and-drop face blur for videos on Windows](docs/screenshot.png)
+
 ---
 
 ## Why use it
