@@ -17,23 +17,43 @@ else
 [X] Python 3 is not installed.
 
 Install one of these (then re-run this file):
-  - From https://www.python.org/downloads/  (recommended)
-  - Or via Homebrew:  brew install python
+  - From https://www.python.org/downloads/  (recommended — bundles Tk)
+  - Or via Homebrew:  brew install python python-tk
 
 EOF
   read -n 1 -s -r -p "Press any key to close."
   exit 1
 fi
 
-echo "Using: $($PY --version)  -> $(which $PY)"
+echo "Using: $($PY --version)  ->  $(which $PY)"
 echo
 
-echo "=== Step 1/2: Upgrading pip ==="
+echo "=== Step 1/3: Upgrading pip ==="
 $PY -m pip install --upgrade pip --user || $PY -m pip install --upgrade pip
 
 echo
-echo "=== Step 2/2: Installing face-blur engine + GUI dependencies ==="
+echo "=== Step 2/3: Installing face-blur engine + GUI dependencies ==="
 $PY -m pip install -r requirements.txt --user || $PY -m pip install -r requirements.txt
+
+echo
+echo "=== Step 3/3: Sanity check (Tk + tkinterdnd2 + deface) ==="
+if $PY -c "import tkinter, tkinterdnd2, deface" 2>/tmp/blurfacefree_check.err; then
+  echo "All good."
+else
+  echo
+  echo "[!] Install finished but a required module failed to import:"
+  cat /tmp/blurfacefree_check.err
+  rm -f /tmp/blurfacefree_check.err
+  echo
+  echo "Most common cause: Homebrew Python ships WITHOUT Tk by default."
+  echo "Fix one of these ways:"
+  echo "  1. Install Python from https://www.python.org/downloads/ (recommended)"
+  echo "  2. Or:  brew install python-tk@3.13   (match your Python minor version)"
+  echo
+  read -n 1 -s -r -p "Press any key to close."
+  exit 1
+fi
+rm -f /tmp/blurfacefree_check.err
 
 echo
 echo "==========================================================="
