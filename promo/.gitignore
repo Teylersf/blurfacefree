@@ -1,0 +1,6 @@
+node_modules/
+out/*
+!out/.gitkeep
+!out/promo.mp4
+.cache/
+

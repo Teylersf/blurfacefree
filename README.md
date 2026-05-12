@@ -14,6 +14,14 @@ Automatically detect and blur faces in MP4, MOV, MKV, AVI, WEBM and more — rig
 
 ![Blur Faces Free GUI — drag-and-drop face blur for videos on Windows and Mac](docs/screenshot.png)
 
+## ▶ 60-second demo
+
+<a href="https://github.com/Teylersf/blurfacefree/raw/main/promo/out/promo.mp4">
+  <img src="docs/promo-thumb.png" alt="Watch the 60-second Blur Faces Free promo — free, offline, drag-and-drop face blur for videos" width="280">
+</a>
+
+**[▶ Watch the 60-second promo (MP4, 1080×1920)](https://github.com/Teylersf/blurfacefree/raw/main/promo/out/promo.mp4)** — built with [Remotion](https://www.remotion.dev/). Source in [`promo/`](promo/).
+
 ---
 
 ## Why use it

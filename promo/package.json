@@ -1,0 +1,21 @@
+{
+  "name": "blurfacefree-promo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion-based 60s YouTube Shorts promo for Blur Faces Free.",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "build": "remotion render src/index.ts Promo out/promo.mp4 --concurrency=4",
+    "build-fast": "remotion render src/index.ts Promo out/promo.mp4 --concurrency=8 --jpeg-quality=80"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.459",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.459"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}
