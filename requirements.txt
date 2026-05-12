@@ -1,4 +1,7 @@
 deface>=1.5.0
 tkinterdnd2>=0.4.3
-onnxruntime-directml>=1.17.0
 onnx>=1.16.0
+
+# GPU / Neural Engine acceleration — chosen per OS automatically by pip
+onnxruntime-directml>=1.17.0; platform_system == "Windows"
+onnxruntime>=1.17.0; platform_system != "Windows"

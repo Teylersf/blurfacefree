@@ -1,0 +1,11 @@
+# Force LF line endings for shell scripts and .command files so they
+# stay executable on macOS / Linux even when committed from Windows.
+*.command text eol=lf
+*.sh text eol=lf
+
+# Keep Windows-native line endings for batch files.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Treat the screenshot as binary.
+*.png binary

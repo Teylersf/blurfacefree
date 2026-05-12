@@ -1,5 +1,6 @@
-"""Drag-and-drop GUI wrapper for deface. Dark-mode redesign."""
+"""Drag-and-drop GUI wrapper for deface. Cross-platform dark-mode UI."""
 import os
+import platform
 import queue
 import re
 import shutil
@@ -19,6 +20,9 @@ try:
     DND_AVAILABLE = True
 except Exception:
     DND_AVAILABLE = False
+
+IS_WIN = platform.system() == "Windows"
+IS_MAC = platform.system() == "Darwin"
 
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mpg", ".mpeg", ".wmv", ".flv"}
 HERE = Path(__file__).resolve().parent
@@ -41,13 +45,26 @@ GREEN = "#34d399"
 YELLOW = "#fbbf24"
 RED = "#f87171"
 
-F_TITLE = ("Segoe UI Variable Display", 24, "bold")
-F_SUB = ("Segoe UI Variable", 11)
-F_HEAD = ("Segoe UI Variable Display", 11, "bold")
-F_BODY = ("Segoe UI Variable", 11)
-F_BTN = ("Segoe UI Variable Display", 11, "bold")
-F_BIG_BTN = ("Segoe UI Variable Display", 13, "bold")
-F_MONO = ("Cascadia Mono", 10)
+if IS_MAC:
+    _DISPLAY = "SF Pro Display"
+    _TEXT = "SF Pro Text"
+    _MONO = "SF Mono"
+elif IS_WIN:
+    _DISPLAY = "Segoe UI Variable Display"
+    _TEXT = "Segoe UI Variable"
+    _MONO = "Cascadia Mono"
+else:
+    _DISPLAY = "DejaVu Sans"
+    _TEXT = "DejaVu Sans"
+    _MONO = "DejaVu Sans Mono"
+
+F_TITLE = (_DISPLAY, 24, "bold")
+F_SUB = (_TEXT, 11)
+F_HEAD = (_DISPLAY, 11, "bold")
+F_BODY = (_TEXT, 11)
+F_BTN = (_DISPLAY, 11, "bold")
+F_BIG_BTN = (_DISPLAY, 13, "bold")
+F_MONO = (_MONO, 10)
 F_DROP = ("Segoe UI Variable Display", 14, "bold")
 
 
@@ -55,10 +72,21 @@ def find_deface():
     exe = shutil.which("deface")
     if exe:
         return [exe]
-    candidate = SCRIPTS_DIR / "deface.exe"
-    if candidate.exists():
-        return [str(candidate)]
+    if IS_WIN:
+        candidate = SCRIPTS_DIR / "deface.exe"
+        if candidate.exists():
+            return [str(candidate)]
     return [sys.executable, "-m", "deface"]
+
+
+def open_path(p: Path):
+    """Open a folder or file with the OS default handler."""
+    if IS_WIN:
+        os.startfile(str(p))  # noqa: S606
+    elif IS_MAC:
+        subprocess.Popen(["open", str(p)])
+    else:
+        subprocess.Popen(["xdg-open", str(p)])
 
 
 def parse_dropped(data: str):
@@ -326,7 +354,7 @@ class App:
     def _open_outdir(self):
         d = Path(self.output_dir.get())
         d.mkdir(parents=True, exist_ok=True)
-        os.startfile(str(d))  # noqa: S606
+        open_path(d)
 
     def _add_path(self, p: Path):
         if p.is_dir():
